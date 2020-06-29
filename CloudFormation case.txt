@@ -1,0 +1,209 @@
+1. VPC
+2. Public Subnet a, c
+Private Subnet a, c
+3. Internet Gateway
+4. LoadBalnacer
+5. Available Zone a, c
+6. AutoScaling
+7. RDS M,S
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+VPC생성		OK
+이름 : BLUM_VPC
+CIDR : 10.0.0.0/16
++ DNS 호스트 이름 활성화
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+퍼블릭 서브넷1 생성		OK
+이름 : First_Public_Subnet
+VPC : BLUM_VPC
+가용 영역 : ap-northeast-2a
+CIDR : 10.0.0.0/24
++ 퍼블릭 IPv4주소 자동할당 활성화
+
+퍼블릭 서브넷2 생성		OK
+이름 : Second_Public_Subnet
+VPC : BLUM_VPC
+가용 영역 : ap-northeast-2c
+CIDR : 10.0.1.0/24
++ 퍼블릭 IPv4주소 자동할당 활성화
+
+프라이빗 서브넷2 생성		OK
+이름 : First_Private_Subnet
+VPC : BLUM_VPC
+가용 영역 : ap-northeast-2a
+CIDR : 10.0.2.0/23
+
+프라이빗 서브넷2 생성		OK
+이름 : Second_Private_Subnet
+VPC : BLUM_VPC
+가용 영역 : ap-northeast-2c
+CIDR : 10.0.4.0/23
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+인터넷 게이트웨이 생성		OK
+이름 : Int_Gateway
++ BLUM_VPC에 연결
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+라우팅 테이블 편집		OK
+VPC와 함께 만들어지는 라우팅 테이블 이름 변경 : BLUM_Private_RT
+서브넷 연결 편집 : First_Private_Subnet, Second_Private_Subnet 추가	-> 라우팅 10.0.0.0/16만 존재
+
+라우팅 테이블 생성		OK
+이름 : BLUM_Public_RT
+VPC : BLUM_VPC
+서브넷 연결 편집 : First_Public_Subnet, Second_Public_Subnet
+라우팅 편집 : 0.0.0.0/0, 대상 : Int_Gateway	-> 라우팅 10.0.0.0/16, 0.0.0.0/0 존재하도록
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+보안그룹 생성		OK
+이름 : BLUM_DB_SG
+VPC : BLUM_VPC
+인바운드 :  MYSQL/Aurora TCP 3306 0.0.0.0/0
+
+이름 : BLUM-Target-SG		OK
+VPC : BLUM_VPC
+인바운드 : HTTP TCP 80 0.0.0.0/0
+	  SSH TCP 22 0.0.0.0/0
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+ALB 생성		OK
+이름 : BLUM-LB
+리스너 : HTTP 80
+가용영역 
+	VPC : BLUM_VPC
+	ap-northeast-2a - First_Public_Subnet
+	ap-northeast-2c - Second_Public_Subnet
+
+
+새 보안그룹 생성		OK
+	이름 : BLUM-LB_SG
+	규칙 : HTTP TCP 80 0.0.0.0/0
+	        HTTPS TPC 443 0.0.0.0/0
+
+라우팅 구성
+	대상그룹 이름 : BLUM-Target-G
+	프로토콜 HTTP 80
+
+
+상태검사 		OK
+	HTTP
+정상 임계값 : 2
+비정상 임계값 : 2 
+제한시간 : 5
+간격 : 10
+성공 코드 : 200
+인스턴스 등록 x
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+AutoScaling 생성
+시작구성
+	AMI : CentOS 7 (x86_64) - with Updates HVM
+	인스턴스 유형 : General purpose T2.micro
+	시작구성이름 : BLUM_LunchCon
+	UserData :
+#!/bin/bash
+#Install HTTP and PHP7.1
+sudo su
+yum -y install httpd-*
+yum -y install wget unzip
+wget -q http://rpms.remirepo.net/enterprise/remi-release-7.rpm
+wget -q https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+rpm -Uvh remi-release-7.rpm epel-release-latest-7.noarch.rpm
+yum -y --enablerepo=remi-php71 install php php-mysql php-fpm php-mbstring php-xml
+yum -y --enablerepo=remi-php71 install zip unzip php-zip
+#Download Web Files
+cd /var/www/html
+wget https://blumwebfils.s3.ap-northeast-2.amazonaws.com/BLUM.zip
+unzip BLUM.zip -d ./BLUM/
+#Start Services
+systemctl start httpd
+systemctl enable httpd
+#HTTP SETTING
+sed -i -e 's~^DocumentRoot "/var/www/html"$~DocumentRoot "/var/www/html/BLUM"~g' /etc/httpd/conf/httpd.conf
+sed -i -e 's~^    DirectoryIndex index.html$~    DirectoryIndex index.html index.php~g' /etc/httpd/conf/httpd.conf
+systemctl restart httpd
+
+	유형 : 루트
+	디바이스 : /dev/sda1
+	크기 : 8GB
+	볼륨유형 : 범용 SSD(GP2)
+	기존 보안그룹 선택 : BLUM-Target-SG
+	기존 키페어 선택 : BLUM_KEY
+AutoScaling 그룹생성
+	그룹 이름 : BLUM_Auto_G
+	그룹크기 : 2
+	네트워크 : BLUM_VPC
+	서브넷 : First_Public_Subnet, Second_Public_Subnet
+	로드밸런싱 : 하나 이상의 로드밸런서에서 트래픽 수신
+	대상 그룹 : BLUM-Target-G
+	상태검사 유형 : EC2
+	상태 검사 유예기간 300초
+	조정 정책을 사용하여 이 그룹의 용량 조절
+					MIN : 2
+					MAX : 4
+					이름 : Scale Group Size
+					지표유형 : 평균 네트워크 입력(바이트)
+					대상 값 90
+					인스턴스 필요 시간 : 90
+					
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+보안그룹 편집			
+	편집 보안그룹 이름 : BLUM_DB_SG
+	인바운드 : MYSQL/Aurora TCP 3306 BLUM-Target-SG		-> 기존 인바운드 규칙 삭제
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+RDS 서브넷 그룹 생성
+이름 : BLUM_DB_SB_G
+VPC : BLUM_VPC
+가용영역 : ap-northeast-2a, ap-northeast-2c
+서브넷 : First_Private_Subnet, Second_Private_Subnet
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+RDS 생성
+방식 : 표준생성
+엔진 : MariaDB
+버전 : MariaDB 10.3.13
+템플릿 : 개발/테스트
+DB 인스턴스 식별자 : BLUM-DB
+마스터 사용자 이름 : blum
+마스터 암호 : 123456789
+DB인스턴스 클래스 : 버스터블 클래스 db.t2.micro
+스토리지 : 프로비저닝된 IOPS(SSD)
+할당된 스토리지 : 100 GB
+프로비저닝된 IOPS : 1000
+최대 스토리지 임계값 : 1000
+다중 AZ 배포 : 대기 인스턴스 생성
+VPC : BLUM_VPC
+서브넷 그룹 : blum_db_sb_g
+퍼블릭 엑세스 가능 x
+VPC 보안 그룹 : BLUM_DB_SG
+포트 : 3306
+초기 데이터베이스 이름 : websb
+DB 파라미터 그룹 : default.mysql8.0
+자동 백업 활성화 o
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
