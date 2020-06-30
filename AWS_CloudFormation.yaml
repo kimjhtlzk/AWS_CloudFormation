@@ -199,9 +199,9 @@ Resources:
       VpcId: !Ref VPC
       SecurityGroupIngress:
         IpProtocol: tcp
-        SourceSecurityGroupName: test-Target-SG
-        FromPort: 80
-        ToPort: 80
+        SourceSecurityGroupId: !Ref NoIngressSecurityGroup1
+        FromPort: 3306
+        ToPort: 3306
 
 # Test-LB-SG
   NoIngressSecurityGroup3:
@@ -237,8 +237,8 @@ Resources:
       #   UnhealthyThreshold: '5'
       #   Interval: '30'
       #   Timeout: '5'
-      # SecurityGroups:
-      #   - !Ref NoIngressSecurityGroup3
+      SecurityGroups:
+        - !Ref NoIngressSecurityGroup3
 
 # Target Group Listener 
   ALBListener:
@@ -269,40 +269,41 @@ Resources:
       # SecurityGroup : 
       #  - !Ref NoIngressSecurityGroup1
 
-# RDS Subnet Group
-  RDSSubnetGroup:
-    Type: 'AWS::RDS::DBSubnetGroup'
-    Properties:
-      DBSubnetGroupDescription: DB Subnet Group Description
-      SubnetIds:
-        - !Ref PrivateSubnet1
-        - !Ref PrivateSubnet2
-      Tags:
-        - Key: Name
-          Value: test stack RDS Subnet Group
+# # RDS Subnet Group
+#   RDSSubnetGroup:
+#     Type: 'AWS::RDS::DBSubnetGroup'
+#     Properties:
+#       DBSubnetGroupDescription: DB Subnet Group Description
+#       SubnetIds:
+#         - !Ref PrivateSubnet1
+#         - !Ref PrivateSubnet2
+#       Tags:
+#         - Key: Name
+#           Value: test stack RDS Subnet Group
 
-# DB instance (RDS)
-  DBinstance:
-    Type: 'AWS::RDS::DBInstance'
-    Properties:
-      AllocatedStorage: '100'
-      DBInstanceClass: db.t2.micro
-      Engine: MariaDB
-      EngineVersion : 10.3.13
-      MultiAZ: 'true'
-      DBInstanceIdentifier: test4-DB
-      DBName: webdb
-      DBSubnetGroupName: !Ref RDSSubnetGroup
-      StorageType: io1
-      Iops: '1000'
-      MaxAllocatedStorage: '1000'
-      Port: '3306'
-      PubliclyAccessible: 'false'
-      MasterUsername : blum
-      MasterUserPassword : 123456789
-      Tags:
-        - Key: Name
-          Value: test stack
+# # DB instance (RDS)
+#   DBinstance:
+#     Type: 'AWS::RDS::DBInstance'
+#     Properties:
+#       AllocatedStorage: '100'
+#       DBInstanceClass: db.t2.micro
+#       Engine: MariaDB
+#       EngineVersion : 10.3.13
+#       MultiAZ: 'true'
+#       DBInstanceIdentifier: test4-DB
+#       DBName: webdb
+#       DBSubnetGroupName: !Ref RDSSubnetGroup
+#       DBSecurityGroups: !Ref NoIngressSecurityGroup2
+#       StorageType: io1
+#       Iops: '1000'
+#       MaxAllocatedStorage: '1000'
+#       Port: '3306'
+#       PubliclyAccessible: 'false'
+#       MasterUsername : blum
+#       MasterUserPassword : 123456789
+#       Tags:
+#         - Key: Name
+#           Value: test stack
 
 #Auto Scaling LunchConfiguration
   SimpleConfig:
