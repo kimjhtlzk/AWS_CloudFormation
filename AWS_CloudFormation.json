@@ -397,9 +397,11 @@
                 "DBSubnetGroupName": {
                     "Ref": "RDSSubnetGroup"
                 },
-                "DBSecurityGroups": {
-                    "Ref": "NoIngressSecurityGroup2"
-                },
+                "VPCSecurityGroups": [
+                    {
+                        "Ref": "NoIngressSecurityGroup2"
+                    }
+                ],
                 "StorageType": "io1",
                 "Iops": "1000",
                 "MaxAllocatedStorage": "1000",

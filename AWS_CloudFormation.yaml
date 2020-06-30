@@ -281,7 +281,16 @@ Resources:
         - Key: Name
           Value: test stack RDS Subnet Group
 
-# DB instance (RDS)
+# # DB SG         # # DBSecurityGroup is not supported in this region
+#   DBSecurityGroup:
+#     Type: AWS::RDS::DBSecurityGroup
+#     Properties:
+#       DBSecurityGroupIngress:
+#         EC2SecurityGroupName:
+#           Ref: NoIngressSecurityGroup2
+#       GroupDescription: Frontend Access
+
+# DB instance (RDS) 
   DBinstance:
     Type: 'AWS::RDS::DBInstance'
     Properties:
@@ -293,7 +302,8 @@ Resources:
       DBInstanceIdentifier: test4-DB
       DBName: webdb
       DBSubnetGroupName: !Ref RDSSubnetGroup
-      DBSecurityGroups: !Ref NoIngressSecurityGroup2
+      VPCSecurityGroups:
+      - Ref: NoIngressSecurityGroup2
       StorageType: io1
       Iops: '1000'
       MaxAllocatedStorage: '1000'
