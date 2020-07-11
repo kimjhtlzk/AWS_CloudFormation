@@ -4,7 +4,7 @@ Description: >-
   route on the public subnets. It deploys a pair of NAT gateways (one in each
   AZ), and default routes for them in the private subnets.
 
-# 파라미터  
+# Parameters  
 Parameters:
   EnvironmentName:
     Description: An environment name that is prefixed to resource names
@@ -44,10 +44,10 @@ Parameters:
     Default: 10.0.4.0/23
 
 
-#리소스
+# Resources
 Resources:
 
-# VPC 생성
+# Create VPC
   VPC:
     Type: 'AWS::EC2::VPC'
     Properties:
@@ -138,13 +138,11 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
-
   PublicSubnet1RouteTableAssociation:
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
     Properties:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet1
-
 
   PublicSubnet2RouteTableAssociation:
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
@@ -173,41 +171,37 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable
       SubnetId: !Ref PrivateSubnet2
 
-# Test-Target-SG 
+# BLUM-Target-SG 
   NoIngressSecurityGroup1:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupName: test-Target-SG
-      GroupDescription: Security group with no ingress rule
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          CidrIp: 0.0.0.0/0
-          FromPort: 22
-          ToPort: 22
-        - IpProtocol: tcp
-          CidrIp: 0.0.0.0/0
-          FromPort: 80
-          ToPort: 80
-
-# Test-DB-SG          
-  NoIngressSecurityGroup2:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupName: test-DB-SG
+      GroupName: BLUM-Target-SG
       GroupDescription: Security group with no ingress rule
       VpcId: !Ref VPC
       SecurityGroupIngress:
         IpProtocol: tcp
-        SourceSecurityGroupId: !Ref NoIngressSecurityGroup1
+        SourceSecurityGroupId: !Ref NoIngressSecurityGroup3 #(LB)
+        FromPort: 80
+        ToPort: 80
+
+# BLUM-DB-SG          
+  NoIngressSecurityGroup2:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: BLUM-DB-SG
+      GroupDescription: Security group with no ingress rule
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        IpProtocol: tcp
+        SourceSecurityGroupId: !Ref NoIngressSecurityGroup1 #(Target-Group)
         FromPort: 3306
         ToPort: 3306
 
-# Test-LB-SG
+# BLUM-LB-SG
   NoIngressSecurityGroup3:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupName: test-LB-SG
+      GroupName: BLUM-LB-SG
       GroupDescription: Security group with no ingress rule
       VpcId: !Ref VPC
       SecurityGroupIngress:
@@ -281,14 +275,14 @@ Resources:
         - Key: Name
           Value: test stack RDS Subnet Group
 
-# # DB SG         # # DBSecurityGroup is not supported in this region
-#   DBSecurityGroup:
-#     Type: AWS::RDS::DBSecurityGroup
-#     Properties:
-#       DBSecurityGroupIngress:
-#         EC2SecurityGroupName:
-#           Ref: NoIngressSecurityGroup2
-#       GroupDescription: Frontend Access
+# DB SG
+  DBSecurityGroup:
+    Type: AWS::RDS::DBSecurityGroup
+    Properties:
+      DBSecurityGroupIngress:
+        EC2SecurityGroupName:
+          Ref: NoIngressSecurityGroup2
+      GroupDescription: Frontend Access
 
 # DB instance (RDS) 
   DBinstance:
